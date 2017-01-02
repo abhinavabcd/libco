@@ -26,3 +26,15 @@ libco通过仅有的几个函数接口 co_create/co_resume/co_yield 再配合 co
  * __thread的协程私有变量、协程间通信的协程信号量co_signal (New);
  * 语言级别的lambda实现，结合协程原地编写并执行后台异步任务 (New);
  * 基于epoll/kqueue实现的小而轻的网络框架，基于时间轮盘实现的高性能定时器;
+ 
+ 
+ 
+ 
+ Fast coroutine library.
+ 
+ Hooks system calls   read , write , send, recv , etc with epoll. So just keep writing your socket program in normal and coroutines will run in parallel.
+ 
+ When you call the  libco's read function ,  it will add your coroutine to listen on epoll(one per thread) and adds to the timeout queue( just a linked list).
+ On every eventloop it basically wait on events for all file descriptors and then see all file descriptors which had timeouts ( Max timeout set is 40s = 40000 ms) 
+ (In the internal side , there is an array created of 40*1000 millis linked lists, and on every time out takes out the elapsed file descriptors and run the co routines , as there is no data in that time , read reutrns with zero data , which we can assumed timeout or error) 
+ 

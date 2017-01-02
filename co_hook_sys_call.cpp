@@ -61,7 +61,7 @@ static inline pid_t GetPid()
 	char **p = (char**)pthread_self();
 	return p ? *(pid_t*)(p + 18) : getpid();
 }
-static rpchook_t *g_rpchook_socket_fd[ 102400 ] = { 0 };
+static rpchook_t *g_rpchook_socket_fd[ 1000000 ] = { 0 };//~100MB !!
 
 typedef int (*socket_pfn_t)(int domain, int type, int protocol);
 typedef int (*connect_pfn_t)(int socket, const struct sockaddr *address, socklen_t address_len);
@@ -187,6 +187,17 @@ static inline rpchook_t * get_by_fd( int fd )
 	}
 	return NULL;
 }
+
+void set_timeouts(int fd , int read_timeout_secs, int write_timeout_secs){
+	rpchook_t * lp =  get_by_fd( fd );
+	if(lp){
+		if(read_timeout_secs!=-1)//do not change
+			lp->read_timeout.tv_sec = read_timeout_secs;
+		if(write_timeout_secs!=-1)
+			lp->write_timeout.tv_sec = write_timeout_secs;
+	}
+}
+
 static inline rpchook_t * alloc_by_fd( int fd )
 {
 	if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
@@ -349,7 +360,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	pf.fd = fd;
 	pf.events = ( POLLIN | POLLERR | POLLHUP );
 
-	int pollret = poll( &pf,1,timeout );
+	int pollret = poll( &pf,1,timeout );/* blocks and continues if there is some data on fd or timeout has occured*/
 
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
 
@@ -955,7 +966,7 @@ struct hostent *co_gethostbyname(const char *name)
 #endif
 
 
-void co_enable_hook_sys() //Õâº¯Êı±ØĞëÔÚÕâÀï,·ñÔò±¾ÎÄ¼ş»á±»ºöÂÔ£¡£¡£¡
+void co_enable_hook_sys() //ï¿½âº¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½á±»ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
 	if( co )

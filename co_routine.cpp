@@ -921,29 +921,32 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
 	//3.add timeout
 
-	unsigned long long now = GetTickMS();
-	arg.ullExpireTime = now + timeout;
-	int ret = AddTimeout( ctx->pTimeout,&arg,now );
-	if( ret != 0 )
-	{
-		co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
-				ret,now,timeout,arg.ullExpireTime);
-		errno = EINVAL;
-
-		if( arg.pPollItems != arr )
+	if(timeout){
+		unsigned long long now = GetTickMS();
+		arg.ullExpireTime = now + timeout;
+		int ret = AddTimeout( ctx->pTimeout,&arg,now );
+		if( ret != 0 )
 		{
-			free( arg.pPollItems );
-			arg.pPollItems = NULL;
-		}
-		free(arg.fds);
-		free(&arg);
+			co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
+					ret,now,timeout,arg.ullExpireTime);
+			errno = EINVAL;
 
-		return -__LINE__;
+			if( arg.pPollItems != arr )
+			{
+				free( arg.pPollItems );
+				arg.pPollItems = NULL;
+			}
+			free(arg.fds);
+			free(&arg);
+
+			return -__LINE__;
+		}
 	}
 
 	co_yield_env( co_get_curr_thread_env() );
-
-	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+	if(timeout){
+		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+	}
 	for(nfds_t i = 0;i < nfds;i++)
 	{
 		int fd = fds[i].fd;

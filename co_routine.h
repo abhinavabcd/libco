@@ -43,6 +43,8 @@ struct stCoEpoll_t;
 typedef int (*pfn_co_eventloop_t)(void *);
 typedef void *(*pfn_co_routine_t)( void * );
 
+void set_timeouts(int fd , int read_timeout_secs, int write_timeout_secs);
+
 //2.co_routine
 
 int 	co_create( stCoRoutine_t **co,const stCoRoutineAttr_t *attr,void *(*routine)(void*),void *arg );
