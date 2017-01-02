@@ -248,12 +248,24 @@ int socket(int domain, int type, int protocol)
 
 int co_accept( int fd, struct sockaddr *addr, socklen_t *len )
 {
+	HOOK_SYS_FUNC( fcntl );
+
 	int cli = accept( fd,addr,len );
 	if( cli < 0 )
 	{
 		return cli;
 	}
-	alloc_by_fd( cli );
+	rpchook_t *lp = alloc_by_fd( cli );
+
+
+	int	current_flags = g_sys_fcntl_func( cli ,F_GETFL, 0 );
+	int flag = current_flags;
+	flag |= O_NONBLOCK;
+
+	int ret = g_sys_fcntl_func( cli ,F_SETFL, flag );
+	if( 0 == ret && lp ){
+		lp->user_flag = current_flags;
+	}
 	return cli;
 }
 int connect(int fd, const struct sockaddr *address, socklen_t address_len)

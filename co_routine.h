@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <sys/poll.h>
 #include <pthread.h>
-
+#include <unistd.h>
 //1.struct
 
 struct stCoRoutine_t;
@@ -43,6 +43,8 @@ struct stCoEpoll_t;
 typedef int (*pfn_co_eventloop_t)(void *);
 typedef void *(*pfn_co_routine_t)( void * );
 
+
+int co_accept( int fd, struct sockaddr *addr, socklen_t *len );
 void set_timeouts(int fd , int read_timeout_secs, int write_timeout_secs);
 
 //2.co_routine
