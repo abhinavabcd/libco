@@ -166,8 +166,8 @@ struct rpchook_connagent_head_t
 	unsigned char    sReserved[6];
 }__attribute__((packed));
 
-
-#define HOOK_SYS_FUNC(name) if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
+#define str(s) #s
+#define HOOK_SYS_FUNC(name) /*printf(str(name));*/if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
 static inline ll64_t diff_ms(struct timeval &begin,struct timeval &end)
 {
