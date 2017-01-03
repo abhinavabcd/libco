@@ -396,7 +396,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 		co_log_err("CO_ERR: AddTimeout line %d diff %d",
 					__LINE__,diff);
 
-		return __LINE__;
+		return -1;// timeout parameter exceeded limits
 	}
 	AddTail( apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize , apItem );
 
@@ -925,8 +925,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		unsigned long long now = GetTickMS();
 		arg.ullExpireTime = now + timeout;
 		int ret = AddTimeout( ctx->pTimeout,&arg,now );
-		if( ret != 0 )
-		{
+		if( ret != 0 && ret!=-1){
 			co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
 					ret,now,timeout,arg.ullExpireTime);
 			errno = EINVAL;
