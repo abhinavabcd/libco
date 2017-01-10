@@ -376,10 +376,16 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
 
-	if( readret < 0 )
-	{
+	if( readret < 0 ){
+		int _set_errno = errno;
 		co_log_err("CO_ERR: read fd %d ret %ld errno %d poll ret %d timeout %d",
 					fd,readret,errno,pollret,timeout);
+
+		errno = _set_errno;
+		if(errno == EAGAIN){
+			errno = LIBCO_POLL_TIMEOUT;
+		}
+
 	}
 
 	return readret;
@@ -427,6 +433,10 @@ ssize_t write( int fd, const void *buf, size_t nbyte )
 		
 		if( writeret <= 0 )
 		{
+			if(errno == EAGAIN){
+				//timeout from co_routine_poll, errno set to indicate special value
+				errno = LIBCO_POLL_TIMEOUT;
+			}
 			break;
 		}
 		wrotelen += writeret ;
@@ -505,6 +515,10 @@ ssize_t recvfrom(int socket, void *buffer, size_t length,
 	poll( &pf,1,timeout );
 
 	ssize_t ret = g_sys_recvfrom_func( socket,buffer,length,flags,address,address_len );
+	if(ret<0 && errno == EAGAIN){
+		//timeout from co_routine_poll, errno set to indicate special value
+		errno = LIBCO_POLL_TIMEOUT;
+	}
 	return ret;
 }
 
@@ -548,6 +562,10 @@ ssize_t send(int socket, const void *buffer, size_t length, int flags)
 		
 		if( writeret <= 0 )
 		{
+			if(errno == EAGAIN){
+				//timeout from co_routine_poll, errno set to indicate special value
+				errno = LIBCO_POLL_TIMEOUT;
+			}
 			break;
 		}
 		wrotelen += writeret ;
@@ -586,8 +604,14 @@ ssize_t recv( int socket, void *buffer, size_t length, int flags )
 
 	if( readret < 0 )
 	{
+		int _set_errno = errno;
 		co_log_err("CO_ERR: read fd %d ret %ld errno %d poll ret %d timeout %d",
 					socket,readret,errno,pollret,timeout);
+		errno = _set_errno;
+		if(errno == EAGAIN){
+			errno = LIBCO_POLL_TIMEOUT;
+		}
+
 	}
 
 	return readret;

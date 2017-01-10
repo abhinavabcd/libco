@@ -44,6 +44,9 @@ typedef int (*pfn_co_eventloop_t)(void *);
 typedef void *(*pfn_co_routine_t)( void * );
 
 
+
+#define LIBCO_POLL_TIMEOUT 1989
+
 int co_accept( int fd, struct sockaddr *addr, socklen_t *len );
 void set_timeouts(int fd , int read_timeout_secs, int write_timeout_secs);
 
