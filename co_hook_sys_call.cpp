@@ -433,7 +433,7 @@ ssize_t write( int fd, const void *buf, size_t nbyte )
 		
 		if( writeret <= 0 )
 		{
-			if(errno == EAGAIN){
+			if(writeret <0 && errno == EAGAIN){
 				//timeout from co_routine_poll, errno set to indicate special value
 				errno = LIBCO_POLL_TIMEOUT;
 			}
@@ -562,7 +562,7 @@ ssize_t send(int socket, const void *buffer, size_t length, int flags)
 		
 		if( writeret <= 0 )
 		{
-			if(errno == EAGAIN){
+			if(writeret<0 && errno == EAGAIN){
 				//timeout from co_routine_poll, errno set to indicate special value
 				errno = LIBCO_POLL_TIMEOUT;
 			}
