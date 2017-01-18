@@ -49,7 +49,7 @@ struct stCoEpoll_t;
 
 struct stCoRoutineEnv_t
 {
-	stCoRoutine_t *pCallStack[ 128 ];
+	stCoRoutine_t *pCallStack[ 100000 ];//.1 million max
 	int iCallStackSize;
 	stCoEpoll_t *pEpoll;
 
@@ -314,6 +314,8 @@ struct stCoEpoll_t
 	struct stTimeoutItemLink_t *pstActiveList;
 
 	co_epoll_res *result; 
+
+	int num_active = 0;
 
 };
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
@@ -921,31 +923,29 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
 	//3.add timeout
 
-	if(timeout){
-		unsigned long long now = GetTickMS();
-		arg.ullExpireTime = now + timeout;
-		int ret = AddTimeout( ctx->pTimeout,&arg,now );
-		if( ret != 0 && ret!=-1){
-			co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
-					ret,now,timeout,arg.ullExpireTime);
-			errno = EINVAL;
+	unsigned long long now = GetTickMS();
+	arg.ullExpireTime = now + timeout;
+	int ret = AddTimeout( ctx->pTimeout,&arg,now );
+	if( ret != 0 && ret!=-1){
+		co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
+				ret,now,timeout,arg.ullExpireTime);
+		errno = EINVAL;
 
-			if( arg.pPollItems != arr )
-			{
-				free( arg.pPollItems );
-				arg.pPollItems = NULL;
-			}
-			free(arg.fds);
-			free(&arg);
-
-			return -__LINE__;
+		if( arg.pPollItems != arr )
+		{
+			free( arg.pPollItems );
+			arg.pPollItems = NULL;
 		}
-	}
+		free(arg.fds);
+		free(&arg);
 
-	co_yield_env( co_get_curr_thread_env() );
-	if(timeout){
-		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+		return -__LINE__;
 	}
+	ctx->num_active+=nfds;
+	co_yield_env( co_get_curr_thread_env() );
+
+	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+	ctx->num_active-=nfds;
 	for(nfds_t i = 0;i < nfds;i++)
 	{
 		int fd = fds[i].fd;
@@ -1136,4 +1136,11 @@ stCoCondItem_t *co_cond_pop( stCoCond_t *link )
 		PopHead<stCoCondItem_t,stCoCond_t>( link );
 	}
 	return p;
+}
+
+/*
+ * utility functions
+ */
+int get_co_routines_count(){
+	return co_get_curr_thread_env()->pEpoll->num_active;
 }
