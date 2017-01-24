@@ -49,7 +49,7 @@ struct stCoEpoll_t;
 
 struct stCoRoutineEnv_t
 {
-	stCoRoutine_t *pCallStack[ 100000 ];//.1 million max
+	stCoRoutine_t *pCallStack[ 128 ];//.1 million max
 	int iCallStackSize;
 	stCoEpoll_t *pEpoll;
 
@@ -315,7 +315,7 @@ struct stCoEpoll_t
 
 	co_epoll_res *result; 
 
-	int num_active = 0;
+	size_t num_active = 0;
 
 };
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
@@ -890,7 +890,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	arg.pfnProcess = OnPollProcessEvent;
 	arg.pArg = GetCurrCo( co_get_curr_thread_env() );
 	
-	
+	size_t num_active = 0;
 	//2. add epoll
 	for(nfds_t i=0;i<nfds;i++)
 	{
@@ -917,6 +917,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 				free(&arg);
 				return pollfunc(fds, nfds, timeout);
 			}
+			num_active++;
 		}
 		//if fail,the timeout would work
 	}
@@ -941,11 +942,11 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
 		return -__LINE__;
 	}
-	ctx->num_active+=nfds;
+	ctx->num_active+=num_active;
 	co_yield_env( co_get_curr_thread_env() );
 
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
-	ctx->num_active-=nfds;
+	ctx->num_active-=num_active;
 	for(nfds_t i = 0;i < nfds;i++)
 	{
 		int fd = fds[i].fd;
