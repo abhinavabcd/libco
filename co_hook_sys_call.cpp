@@ -961,54 +961,42 @@ extern "C"
 	}
 }
 
-struct hostbuf_wrap 
-{
-	struct hostent host;
-	char* buffer;
-	size_t iBufferSize;
-	int host_errno;
-};
 
-CO_ROUTINE_SPECIFIC(hostbuf_wrap, __co_hostbuf_wrap);
 
 #ifndef __APPLE__
-struct hostent *co_gethostbyname(const char *name)
-{
+struct hostent *co_gethostbyname(const char *name, hostent *host){
 	if (!name)
 	{
 		return NULL;
 	}
-
-	if (__co_hostbuf_wrap->buffer && __co_hostbuf_wrap->iBufferSize > 1024)
-	{
-		free(__co_hostbuf_wrap->buffer);
-		__co_hostbuf_wrap->buffer = NULL;
+	bool is_created  = false;
+	if(!host){
+		is_created =true;
+		host = (hostent*)malloc(sizeof(hostent));
 	}
-	if (!__co_hostbuf_wrap->buffer)
-	{
-		__co_hostbuf_wrap->buffer = (char*)malloc(1024);
-		__co_hostbuf_wrap->iBufferSize = 1024;
-	}
-
-	struct hostent *host = &__co_hostbuf_wrap->host;
-	struct hostent *result = NULL;
-	int *h_errnop = &(__co_hostbuf_wrap->host_errno);
-
 	int ret = -1;
-	while (ret = gethostbyname_r(name, host, __co_hostbuf_wrap->buffer, 
-				__co_hostbuf_wrap->iBufferSize, &result, h_errnop) == ERANGE && 
-				*h_errnop == NETDB_INTERNAL )
-	{
-		free(__co_hostbuf_wrap->buffer);
-		__co_hostbuf_wrap->iBufferSize = __co_hostbuf_wrap->iBufferSize * 2;
-		__co_hostbuf_wrap->buffer = (char*)malloc(__co_hostbuf_wrap->iBufferSize);
+	char *buf = (char*)malloc(1024);
+	size_t buf_size = 1024;
+	struct hostent *result = NULL;
+	int h_errnop;
+	while (ret = gethostbyname_r(name, host, buf,
+				buf_size, &result, &h_errnop) == ERANGE &&
+				h_errnop == NETDB_INTERNAL ){
+		free(buf);
+		buf_size*= 2;
+		buf = (char*)malloc(buf_size);
 	}
-
-	if (ret == 0 && (host == result)) 
-	{
+	free(buf);
+	if (ret == 0 && (host == result)){
 		return host;
 	}
+	if(is_created){
+		free(host);
+	}
 	return NULL;
+}
+struct hostent *co_gethostbyname(const char *name){
+	return co_gethostbyname(name, NULL);
 }
 #endif
 

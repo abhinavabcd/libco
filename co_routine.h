@@ -98,6 +98,7 @@ void co_log_err( const char *fmt,... );
 
 //9.utility functions
 int get_co_routines_count();
+struct hostent *co_gethostbyname(const char *name, hostent *host);
 
 #endif
 

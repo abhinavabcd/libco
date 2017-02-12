@@ -285,7 +285,9 @@ stShareStack_t* co_alloc_sharestack(int count, int stack_size)
 	share_stack->stack_array = stack_array;
 	return share_stack;
 }
-
+/*
+ * assign one of the slots to run the program. (Each thread assigned slots to run coroutines, by copy in and out of them)//should reduce ram usage, if stacks are less than pre defined sizes
+ */
 static stStackMem_t* co_get_stackmem(stShareStack_t* share_stack)
 {
 	if (!share_stack)
@@ -522,13 +524,16 @@ int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine
 }
 void co_free( stCoRoutine_t *co )
 {
+	if(co->save_buffer){
+		free(co->save_buffer);
+	}
 	free( co );
 }
 void co_release( stCoRoutine_t *co )
 {
 	if( co->cEnd )
 	{
-		free( co );
+		co_free(co);
 	}
 }
 
