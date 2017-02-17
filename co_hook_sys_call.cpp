@@ -166,7 +166,7 @@ struct rpchook_connagent_head_t
 	unsigned char    sReserved[6];
 }__attribute__((packed));
 
-#define str(s) #s
+#define str(s) #s //uncomment below if you just want to see hooked function some 3rd party libraries user.
 #define HOOK_SYS_FUNC(name) /*printf(str(name));*/if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
 static inline ll64_t diff_ms(struct timeval &begin,struct timeval &end)
@@ -961,42 +961,54 @@ extern "C"
 	}
 }
 
+struct hostbuf_wrap 
+{
+	struct hostent host;
+	char* buffer;
+	size_t iBufferSize;
+	int host_errno;
+};
 
+CO_ROUTINE_SPECIFIC(hostbuf_wrap, __co_hostbuf_wrap);
 
 #ifndef __APPLE__
-struct hostent *co_gethostbyname(const char *name, hostent *host){
+struct hostent *co_gethostbyname(const char *name)
+{
 	if (!name)
 	{
 		return NULL;
 	}
-	bool is_created  = false;
-	if(!host){
-		is_created =true;
-		host = (hostent*)malloc(sizeof(hostent));
+
+	if (__co_hostbuf_wrap->buffer && __co_hostbuf_wrap->iBufferSize > 1024)
+	{
+		free(__co_hostbuf_wrap->buffer);
+		__co_hostbuf_wrap->buffer = NULL;
 	}
-	int ret = -1;
-	char *buf = (char*)malloc(1024);
-	size_t buf_size = 1024;
+	if (!__co_hostbuf_wrap->buffer)
+	{
+		__co_hostbuf_wrap->buffer = (char*)malloc(1024);
+		__co_hostbuf_wrap->iBufferSize = 1024;
+	}
+
+	struct hostent *host = &__co_hostbuf_wrap->host;
 	struct hostent *result = NULL;
-	int h_errnop;
-	while (ret = gethostbyname_r(name, host, buf,
-				buf_size, &result, &h_errnop) == ERANGE &&
-				h_errnop == NETDB_INTERNAL ){
-		free(buf);
-		buf_size*= 2;
-		buf = (char*)malloc(buf_size);
+	int *h_errnop = &(__co_hostbuf_wrap->host_errno);
+
+	int ret = -1;
+	while (ret = gethostbyname_r(name, host, __co_hostbuf_wrap->buffer, 
+				__co_hostbuf_wrap->iBufferSize, &result, h_errnop) == ERANGE && 
+				*h_errnop == NETDB_INTERNAL )
+	{
+		free(__co_hostbuf_wrap->buffer);
+		__co_hostbuf_wrap->iBufferSize = __co_hostbuf_wrap->iBufferSize * 2;
+		__co_hostbuf_wrap->buffer = (char*)malloc(__co_hostbuf_wrap->iBufferSize);
 	}
-	free(buf);
-	if (ret == 0 && (host == result)){
+
+	if (ret == 0 && (host == result)) 
+	{
 		return host;
 	}
-	if(is_created){
-		free(host);
-	}
 	return NULL;
-}
-struct hostent *co_gethostbyname(const char *name){
-	return co_gethostbyname(name, NULL);
 }
 #endif
 
