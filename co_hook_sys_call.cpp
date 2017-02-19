@@ -203,8 +203,8 @@ static inline rpchook_t * alloc_by_fd( int fd )
 	if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
 	{
 		rpchook_t *lp = (rpchook_t*)calloc( 1,sizeof(rpchook_t) );
-		lp->read_timeout.tv_sec = 1;
-		lp->write_timeout.tv_sec = 1;
+		lp->read_timeout.tv_sec = 40;
+		lp->write_timeout.tv_sec = 10;
 		g_rpchook_socket_fd[ fd ] = lp;
 		return lp;
 	}
