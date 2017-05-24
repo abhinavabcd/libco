@@ -391,6 +391,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	return readret;
 	
 }
+// does a complete write unline default write , returning bytes written
 ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which would return only on successfully writing entire data
 {
 	HOOK_SYS_FUNC( write );
@@ -410,10 +411,9 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 	int timeout = ( lp->write_timeout.tv_sec * 1000 ) 
 				+ ( lp->write_timeout.tv_usec / 1000 );
 
-
 	ssize_t writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
 	if(writeret <0 && (errno == EAGAIN || errno == EWOULDBLOCK )){
-		//shouldn't usually happen, underlying device might be busy
+		//retry with libco poll
 		writeret = 0;
 	}
 
@@ -422,7 +422,7 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 	}
 	wrotelen+=writeret;
 
-	while( wrotelen < nbyte ){
+	while( wrotelen < nbyte ){//write data to socket as much as possible
 
 		struct pollfd pf = { 0 };
 		pf.fd = fd;
@@ -430,7 +430,9 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 		poll( &pf,1,timeout );
 		//is writeable or poll timedout here
 		writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
-		if(writeret <0 ){
+		
+		if( writeret <= 0 )
+		{
 			//timeout from co_routine_poll, errno set to indicate special value
 			if( errno == EAGAIN  || errno == EWOULDBLOCK ){
 				//poll timed out , the socket is still unwritable
@@ -440,7 +442,7 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 		}
 		wrotelen += writeret ;
 	}
-	if (writeret <= 0 && wrotelen < nbyte){
+	if (writeret <= 0 && wrotelen == 0){
 		return writeret;
 	}
 	return wrotelen;
@@ -499,7 +501,10 @@ ssize_t sendto(int socket, const void *message, size_t length,
 		}
 		bytes_written += ret ;
 	}
-	return ret;
+	if (ret <= 0 && bytes_written == 0){
+		return bytes_written;
+	}
+	return bytes_written;
 }
 
 ssize_t recvfrom(int socket, void *buffer, size_t length,
@@ -535,25 +540,25 @@ ssize_t recvfrom(int socket, void *buffer, size_t length,
 	return ret;
 }
 
-ssize_t send(int socket, const void *buf, size_t length, int flags)
+ssize_t send(int socket, const void *buffer, size_t length, int flags)
 {
 	HOOK_SYS_FUNC( send );
 	
 	if( !co_is_enable_sys_hook() )
 	{
-		return g_sys_send_func( socket,buf,length,flags );
+		return g_sys_send_func( socket,buffer,length,flags );
 	}
 	rpchook_t *lp = get_by_fd( socket );
 
 	if( !lp || ( O_NONBLOCK & lp->user_flag ) )
 	{
-		return g_sys_send_func( socket,buf,length,flags );
+		return g_sys_send_func( socket,buffer,length,flags );
 	}
 	size_t wrotelen = 0;
 	int timeout = ( lp->write_timeout.tv_sec * 1000 ) 
 				+ ( lp->write_timeout.tv_usec / 1000 );
 
-	ssize_t writeret = g_sys_send_func( socket,buf,length,flags );
+	ssize_t writeret = g_sys_send_func( socket,buffer,length,flags );
 	if(writeret <0 && (errno == EAGAIN || errno == EWOULDBLOCK )){
 			//shouldn't usually happen, underlying device might be busy
 			writeret = 0;
@@ -570,10 +575,11 @@ ssize_t send(int socket, const void *buf, size_t length, int flags)
 			pf.fd = socket;
 			pf.events = ( POLLOUT | POLLERR | POLLHUP );
 			poll( &pf,1,timeout );
-			//is writeable or poll timedout here
-			writeret = g_sys_send_func( socket,(const char*)buf + wrotelen,length - wrotelen,flags );
-			if(writeret <0 ){
-				//timeout from co_routine_poll, errno set to indicate special value
+
+			writeret = g_sys_send_func( socket,(const char*)buffer + wrotelen,length - wrotelen,flags );
+		
+			if( writeret <= 0 )
+			{
 				if( errno == EAGAIN  || errno == EWOULDBLOCK ){
 					//poll timed out , the socket is still unwritable
 					errno = LIBCO_POLL_TIMEOUT;
@@ -582,10 +588,11 @@ ssize_t send(int socket, const void *buf, size_t length, int flags)
 			}
 			wrotelen += writeret ;
 		}
-		if (writeret <= 0 && wrotelen < length){
-			return writeret;
-		}
-		return wrotelen;
+	if (writeret <= 0 && wrotelen == 0)
+	{
+		return writeret;
+	}
+	return wrotelen;
 }
 
 ssize_t recv( int socket, void *buffer, size_t length, int flags )
