@@ -411,6 +411,7 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 	int timeout = ( lp->write_timeout.tv_sec * 1000 ) 
 				+ ( lp->write_timeout.tv_usec / 1000 );
 
+
 	ssize_t writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
 	if(writeret <0 && (errno == EAGAIN || errno == EWOULDBLOCK )){
 		//retry with libco poll
@@ -430,9 +431,7 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 		poll( &pf,1,timeout );
 		//is writeable or poll timedout here
 		writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
-		
-		if( writeret <= 0 )
-		{
+		if( writeret < 0 ){
 			//timeout from co_routine_poll, errno set to indicate special value
 			if( errno == EAGAIN  || errno == EWOULDBLOCK ){
 				//poll timed out , the socket is still unwritable
@@ -502,7 +501,7 @@ ssize_t sendto(int socket, const void *message, size_t length,
 		bytes_written += ret ;
 	}
 	if (ret <= 0 && bytes_written == 0){
-		return bytes_written;
+		return ret;
 	}
 	return bytes_written;
 }
@@ -562,32 +561,32 @@ ssize_t send(int socket, const void *buffer, size_t length, int flags)
 	if(writeret <0 && (errno == EAGAIN || errno == EWOULDBLOCK )){
 			//shouldn't usually happen, underlying device might be busy
 			writeret = 0;
-		}
+	}
 
-		if(writeret<0){
-			return writeret;
-		}
-		wrotelen+=writeret;
+	if(writeret<0){
+		return writeret;
+	}
+	wrotelen+=writeret;
 
-		while( wrotelen < length ){
+	while( wrotelen < length ){
 
-			struct pollfd pf = { 0 };
-			pf.fd = socket;
-			pf.events = ( POLLOUT | POLLERR | POLLHUP );
-			poll( &pf,1,timeout );
+		struct pollfd pf = { 0 };
+		pf.fd = socket;
+		pf.events = ( POLLOUT | POLLERR | POLLHUP );
+		poll( &pf,1,timeout );
 
-			writeret = g_sys_send_func( socket,(const char*)buffer + wrotelen,length - wrotelen,flags );
-		
-			if( writeret <= 0 )
-			{
-				if( errno == EAGAIN  || errno == EWOULDBLOCK ){
-					//poll timed out , the socket is still unwritable
-					errno = LIBCO_POLL_TIMEOUT;
-				}
-				break;
+		writeret = g_sys_send_func( socket,(const char*)buffer + wrotelen,length - wrotelen,flags );
+
+		if( writeret <= 0 )
+		{
+			if( errno == EAGAIN  || errno == EWOULDBLOCK ){
+				//poll timed out , the socket is still unwritable
+				errno = LIBCO_POLL_TIMEOUT;
 			}
-			wrotelen += writeret ;
+			break;
 		}
+		wrotelen += writeret ;
+	}
 	if (writeret <= 0 && wrotelen == 0)
 	{
 		return writeret;

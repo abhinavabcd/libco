@@ -32,15 +32,28 @@ libco通过仅有的几个函数接口 co_create/co_resume/co_yield 再配合 co
  
  Fast coroutine library.
  
- Hooks system calls   read , write , send, recv , etc with epoll. Keep writing your socket programs normally and coroutines will run in parallel.
+ Hooks system calls   read , write , send, recv , etc with epoll. Keep writing your socket programs as if in blocking mode, and hooking this library , coroutines will run in parallel.
  
  
  Basics:  Coroutines are normal functions , whose stack is allocated on heap. Whenever they need to run , the context associated(contains all register values, stack pointer sp , bp , etc) is copied to the processor and starts execution from there, neat.
   
- 
- 
+
  
  When you call the  libco's read function ,  it will add your coroutine to listen on epoll(one per thread) and adds to the timeout queue( just a linked list).
  On every eventloop it basically wait on events for all file descriptors and then see all file descriptors which had timeouts ( Max timeout set is 40s = 40000 ms) 
  (In the internal side , there is an array created of 40*1000 millis linked lists, and on every time out takes out the elapsed file descriptors and run the co routines , as there is no data in that time , read reutrns with zero data , which we can assumed timeout or error) 
  
+
+ 
+Changes from original:
+instead of standard EGAIN, EWOULDBLOCK,  this changed version returns LIBCO_POLL_TIMEOUT.
+changed co_accept function to set o_nonblock flag correctly.
+
+
+
+
+
+
+
+
+
