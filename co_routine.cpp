@@ -534,7 +534,11 @@ int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine
 }
 void co_free( stCoRoutine_t *co )
 {
-<<<<<<< HEAD
+    if (!co->cIsShareStack) 
+    {    
+        free(co->stack_mem->stack_buffer);
+        free(co->stack_mem);
+    }   
 	if(co->save_buffer){
 		free(co->save_buffer);
 	}
@@ -542,22 +546,7 @@ void co_free( stCoRoutine_t *co )
 }
 void co_release( stCoRoutine_t *co )
 {
-	if( co->cEnd )
-	{
-		co_free(co);
-	}
-=======
-    if (!co->cIsShareStack) 
-    {    
-        free(co->stack_mem->stack_buffer);
-        free(co->stack_mem);
-    }   
-    free( co );
-}
-void co_release( stCoRoutine_t *co )
-{
     co_free( co );
->>>>>>> 83d2343800e920ccafd7e63fc9b14bf630418c9d
 }
 
 void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co);
@@ -968,13 +957,8 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	unsigned long long now = GetTickMS();
 	arg.ullExpireTime = now + timeout;
 	int ret = AddTimeout( ctx->pTimeout,&arg,now );
-<<<<<<< HEAD
-	if( ret != 0 && ret!=-1){
-=======
 	int iRaiseCnt = 0;
-	if( ret != 0 )
-	{
->>>>>>> 83d2343800e920ccafd7e63fc9b14bf630418c9d
+	if( ret != 0 && ret!=-1){
 		co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
 				ret,now,timeout,arg.ullExpireTime);
 		errno = EINVAL;
@@ -1000,7 +984,6 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 			fds[i].revents = arg.fds[i].revents;
 		}
 
-<<<<<<< HEAD
 		return -__LINE__;
 	}
 	ctx->num_active+=num_active;
@@ -1011,11 +994,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	for(nfds_t i = 0;i < nfds;i++)
 	{
 		int fd = fds[i].fd;
-		if( fd > -1 )
-=======
-
-		if( arg.pPollItems != arr )
->>>>>>> 83d2343800e920ccafd7e63fc9b14bf630418c9d
+		if( fd > -1  || arg.pPollItems != arr)
 		{
 			free( arg.pPollItems );
 			arg.pPollItems = NULL;
