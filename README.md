@@ -1,4 +1,5 @@
-#Libco
+Libco
+===========
 Libco is a c/c++ coroutine library that is widely used in WeChat services. It has been running on tens of thousands of machines since 2013.
 
 Author: sunnyxu(sunnyxu@tencent.com), leiffyli(leiffyli@tencent.com), dengoswei@gmail.com(dengoswei@tencent.com), sarlmolchen(sarlmolchen@tencent.com)
@@ -15,6 +16,8 @@ libco是微信后台大规模使用的c/c++协程库，2013年至今稳定运行
 libco通过仅有的几个函数接口 co_create/co_resume/co_yield 再配合 co_poll，可以支持同步或者异步的写法，如线程库一样轻松。同时库里面提供了socket族函数的hook，使得后台逻辑服务几乎不用修改逻辑代码就可以完成异步化改造。
 
 作者: sunnyxu(sunnyxu@tencent.com), leiffyli(leiffyli@tencent.com), dengoswei@gmail.com(dengoswei@tencent.com), sarlmolchen(sarlmolchen@tencent.com)
+
+PS: **近期将开源PaxosStore，敬请期待。**
 
 ### libco的特性
 - 无需侵入业务逻辑，把多进程、多线程服务改造成协程服务，并发能力得到百倍提升;
@@ -41,11 +44,11 @@ libco通过仅有的几个函数接口 co_create/co_resume/co_yield 再配合 co
  
  When you call the  libco's read function ,  it will add your coroutine to listen on epoll(one per thread) and adds to the timeout queue( just a linked list).
  On every eventloop it basically wait on events for all file descriptors and then see all file descriptors which had timeouts ( Max timeout set is 40s = 40000 ms) 
- (In the internal side , there is an array created of 40*1000 millis linked lists, and on every time out takes out the elapsed file descriptors and run the co routines , as there is no data in that time , read reutrns with zero data , which we can assumed timeout or error) 
+ (In the internal side , there is an array created of 40*1000 millis linked lists, and on every time out takes out the elapsed file descriptors and run the co routines , as there is no data in that time , read reutrns with zero data , which we can assumed as  timeout or error) 
  
 
  
-Changes from original:
+Changes from original libco:
 instead of standard EGAIN, EWOULDBLOCK,  this changed version returns LIBCO_POLL_TIMEOUT.
 changed co_accept function to set o_nonblock flag correctly.
 
@@ -55,5 +58,21 @@ changed co_accept function to set o_nonblock flag correctly.
 
 
 
+### Build
+
+```bash
+$ cd /path/to/libco
+$ make
+```
+
+or use cmake
+
+```bash
+$ cd /path/to/libco
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+```
 
 
