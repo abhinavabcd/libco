@@ -18,6 +18,7 @@
 
 
 #ifndef __CO_ROUTINE_INNER_H__
+#define __CO_ROUTINE_INNER_H__
 
 #include "co_routine.h"
 #include "coctx.h"
@@ -107,5 +108,3 @@ void 				SetEpoll( stCoRoutineEnv_t *env,stCoEpoll_t *ev );
 typedef void (*pfnCoRoutineFunc_t)();
 
 #endif
-
-#define __CO_ROUTINE_INNER_H__

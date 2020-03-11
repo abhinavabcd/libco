@@ -167,7 +167,7 @@ struct rpchook_connagent_head_t
 	unsigned char    sReserved[6];
 }__attribute__((packed));
 
-#define str(s) #s //uncomment below if you just want to see hooked function some 3rd party libraries user.
+#define str(s) #s //uncomment below if you just want to see hooked function some 3rd party libraries uses.
 #define HOOK_SYS_FUNC(name) /*printf(str(name));*/if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
 static inline ll64_t diff_ms(struct timeval &begin,struct timeval &end)
@@ -315,24 +315,24 @@ int connect(int fd, const struct sockaddr *address, socklen_t address_len)
 			break;
 		}
 	}
+
 	if( pf.revents & POLLOUT ) //connect succ
 	{
-		errno = 0;
-		return 0;
-	}
+    // 3.check getsockopt ret
+    int err = 0;
+    socklen_t errlen = sizeof(err);
+    ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen);
+    if (ret < 0) {
+      return ret;
+    } else if (err != 0) {
+      errno = err;
+      return -1;
+    }
+    errno = 0;
+    return 0;
+  }
 
-	//3.set errno
-	int err = 0;
-	socklen_t errlen = sizeof(err);
-	getsockopt( fd,SOL_SOCKET,SO_ERROR,&err,&errlen);
-	if( err ) 
-	{
-		errno = err;
-	}
-	else
-	{
-		errno = ETIMEDOUT;
-	} 
+  errno = ETIMEDOUT;
 	return ret;
 }
 
@@ -411,7 +411,6 @@ ssize_t write( int fd, const void *buf, size_t nbyte ) //special write which wou
 	size_t wrotelen = 0;
 	int timeout = ( lp->write_timeout.tv_sec * 1000 ) 
 				+ ( lp->write_timeout.tv_usec / 1000 );
-
 
 	ssize_t writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
 	if(writeret <0 && (errno == EAGAIN || errno == EWOULDBLOCK )){
@@ -736,6 +735,9 @@ int fcntl(int fildes, int cmd, ...)
 		case F_GETFD:
 		{
 			ret = g_sys_fcntl_func( fildes,cmd );
+      if (lp && !(lp->user_flag & O_NONBLOCK)) {
+          ret = ret & (~O_NONBLOCK);
+      }
 			break;
 		}
 		case F_SETFD:

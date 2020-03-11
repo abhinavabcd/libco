@@ -44,7 +44,6 @@ typedef int (*pfn_co_eventloop_t)(void *);
 typedef void *(*pfn_co_routine_t)( void * );
 
 
-
 #define LIBCO_POLL_TIMEOUT 1989
 
 int co_accept( int fd, struct sockaddr *addr, socklen_t *len );
@@ -57,6 +56,7 @@ void    co_resume( stCoRoutine_t *co );
 void    co_yield( stCoRoutine_t *co );
 void    co_yield_ct(); //ct = current thread
 void    co_release( stCoRoutine_t *co );
+void    co_reset(stCoRoutine_t * co); 
 
 stCoRoutine_t *co_self();
 

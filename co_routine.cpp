@@ -50,7 +50,7 @@ struct stCoEpoll_t;
 
 struct stCoRoutineEnv_t
 {
-	stCoRoutine_t *pCallStack[ 128 ];//.1 million max
+	stCoRoutine_t *pCallStack[ 128 ];
 	int iCallStackSize;
 	stCoEpoll_t *pEpoll;
 
@@ -324,8 +324,6 @@ struct stCoEpoll_t
 
 	co_epoll_res *result; 
 
-	size_t num_active = 0;
-
 };
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
 typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
@@ -539,10 +537,18 @@ void co_free( stCoRoutine_t *co )
         free(co->stack_mem->stack_buffer);
         free(co->stack_mem);
     }   
-	if(co->save_buffer){
-		free(co->save_buffer);
-	}
-	free( co );
+    //walkerdu fix at 2018-01-20
+    //存在内存泄漏
+    else 
+    {
+        if(co->save_buffer)
+            free(co->save_buffer);
+
+        if(co->stack_mem->occupy_co == co)
+            co->stack_mem->occupy_co = NULL;
+    }
+
+    free( co );
 }
 void co_release( stCoRoutine_t *co )
 {
@@ -565,6 +571,31 @@ void co_resume( stCoRoutine_t *co )
 
 
 }
+
+
+// walkerdu 2018-01-14                                                                              
+// 用于reset超时无法重复使用的协程                                                                  
+void co_reset(stCoRoutine_t * co)
+{
+    if(!co->cStart || co->cIsMain)
+        return;
+
+    co->cStart = 0;
+    co->cEnd = 0;
+
+    // 如果当前协程有共享栈被切出的buff，要进行释放
+    if(co->save_buffer)
+    {
+        free(co->save_buffer);
+        co->save_buffer = NULL;
+        co->save_size = 0;
+    }
+
+    // 如果共享栈被当前协程占用，要释放占用标志，否则被切换，会执行save_stack_buffer()
+    if(co->stack_mem->occupy_co == co)
+        co->stack_mem->occupy_co = NULL;
+}
+
 void co_yield_env( stCoRoutineEnv_t *env )
 {
 	
@@ -882,6 +913,8 @@ stCoRoutine_t *GetCurrThreadCo( )
 	return GetCurrCo(env);
 }
 
+/*just a counter for current active coroutines*/
+thread_local size_t _num_co_routines_active = 0;
 
 
 typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
@@ -967,7 +1000,9 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	}
     else
 	{
+		_num_co_routines_active += num_active;
 		co_yield_env( co_get_curr_thread_env() );
+		_num_co_routines_active -= num_active;
 		iRaiseCnt = arg.iRaiseCnt;
 	}
 
@@ -984,17 +1019,8 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 			fds[i].revents = arg.fds[i].revents;
 		}
 
-		return -__LINE__;
-	}
-	ctx->num_active+=num_active;
-	co_yield_env( co_get_curr_thread_env() );
 
-	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
-	ctx->num_active-=num_active;
-	for(nfds_t i = 0;i < nfds;i++)
-	{
-		int fd = fds[i].fd;
-		if( fd > -1  || arg.pPollItems != arr)
+		if( arg.pPollItems != arr )
 		{
 			free( arg.pPollItems );
 			arg.pPollItems = NULL;
@@ -1179,5 +1205,5 @@ stCoCondItem_t *co_cond_pop( stCoCond_t *link )
  * utility functions
  */
 int get_co_routines_count(){
-	return co_get_curr_thread_env()->pEpoll->num_active;
+	return _num_co_routines_active;
 }
